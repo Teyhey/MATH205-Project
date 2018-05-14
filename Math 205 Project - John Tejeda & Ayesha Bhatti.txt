@@ -1,0 +1,149 @@
+    x<-read.csv(file=file.choose(),header=TRUE,sep=",")
+    x1<-x[,1]
+    y1<-x[,2]
+    x1<-x1[!is.na(x1)]
+    y1<-y1[!is.na(y1)]
+    n1<-length(x1)
+    n2<-length(y1)
+    CSK<-as.character(x[1,3])
+    DI<-as.character(x[2,3])
+    x1y1<-c(x1,y1)
+
+    xquart<-quantile(x1, type = 6)
+    yquart<-quantile(y1, type = 6)
+    xIQR<-IQR(x1, type=6)
+    yIQR<-IQR(y1, type=6)
+
+    xlower<-xquart[2]-(1.5*xIQR)
+    xupper<-xquart[4]+(1.5*xIQR)
+    ylower<-yquart[2]-(1.5*yIQR)
+    yupper<-yquart[4]+(1.5*yIQR)
+
+    xnorm<-shapiro.test(x1)
+    ynorm<-shapiro.test(y1)
+
+
+checkOutliers<-function(data, low, up){
+    size<-length(data)
+    while(size > 0){
+        if(data[size] > up || data[size] < low){
+            return(TRUE)
+        } else {
+            size<-size-1
+        }
+    }
+    return(FALSE)
+}
+
+xOutliers<-checkOutliers(x1, xlower, xupper)
+yOutliers<-checkOutliers(y1, ylower, yupper)
+
+beginTests<-function(){
+
+    if (DI == "I"){
+        if (CSK == "K"){
+            xsuccess<-sum(x1)
+            ysuccess<-sum(y1)
+            propmatrix<-matrix(c(xsuccess, ysuccess, n1, n2), ncol=2)
+            print("Proportion Test")
+            print(prop.test(propmatrix))
+        }
+
+        else if (CSK == "C"){
+            if (!xOutliers && !yOutliers){
+                labx<-c(1:n1)/c(1:n1)
+                laby<-c(1:n2)/(c(1:n2)*2)
+                labxy<-c(labx, laby)
+                equalvar<-bartlett.test(x1y1,labxy)
+                if ((n1 + n2) < 15){
+                    if (xnorm$p.value > 0.05 && ynorm$p.value > 0.05){
+                        if (equalvar$p.value < 0.05){
+                            print("n1 + n2 < 15 - Non Pooled Two Sample T")
+                            print(t.test(x1, y1, alternative = c("two.sided"), paired = FALSE, var.equal = FALSE, conf.level = 0.95))
+                        }
+                        else{
+                            print("n1 + n2 < 15 - Pooled Two Sample T")
+                            print(t.test(x1, y1, alternative = c("two.sided"), paired = FALSE, var.equal = TRUE, conf.level = 0.95))
+                        }
+                    }
+                    else{
+                        print("Normality violated: Small Two Sample T Test Terminated")
+                    }
+                }
+                else{
+                    if (equalvar$p.value < 0.05){
+                        print("n1 + n2 >= 15 - Non Pooled Two Sample T")
+                        print(t.test(x1, y1, alternative = c("two.sided"), paired = FALSE, var.equal = FALSE, conf.level = 0.95))
+                    }
+                    else{
+                        print("n1 + n2 >= 15 - Pooled Two Sample T")
+                        print(t.test(x1, y1, alternative = c("two.sided"), paired = FALSE, var.equal = TRUE, conf.level = 0.95))
+                    }
+                }
+            }
+            else{
+                print("Outliers present: Two Sample T Test Terminated")
+            }
+        }
+        else if (CSK == "S"){
+            if (!xOutliers && !yOutliers){
+                if (xnorm$p.value > 0.05 && ynorm$p.value > 0.05){
+                    print("F Test")
+                    print(var.test(x1, y1, alternative = c("two.sided"), conf.level = 0.95))
+                }
+                else{
+                    print("Normality violated: F Test Terminated")
+                }
+            }
+            else{
+                print("Outliers present: F Test Terminated")
+            }
+        }
+    }
+    if (DI == "D"){
+        if (CSK == "C"){
+            if (!xOutliers && !yOutliers){
+                if (n1 == n2 && n1 < 15){
+                    if (xnorm$p.value > 0.05 && ynorm$p.value >0.05){
+                        print("n < 15 - Paired Two Sample T")
+                        print(t.test(x1, y1, alternative=c("two.sided"), paired=TRUE, conf.level = 0.95))
+                    }
+                    else{
+                        print("Normality violated: Small Sample Paired Two Sample T Test Terminated")
+                    }
+                }
+                else if (n1 == n2 && n1 >= 15){
+                    print("n >= 15 - Paired Two Sample T")
+                    print(t.test(x1, y1, alternative=c("two.sided"), paired=TRUE, conf.level = 0.95))
+                }
+            }
+            else{
+                if(n1 == n2)
+                {
+                    if (xnorm$p.value < 0.05 && ynorm$p.value < 0.05){
+                        xminusy<-x1-y1
+                        pluscount = 0
+                        n<-length(xminusy)
+                        while(n>0)
+                        {
+                            if (xminusy[n] > 0)
+                            {
+                                pluscount<-pluscount+1
+                            }
+                        }
+                        print("Sign Test")
+                        print(binom.test(pluscount, n1, p=0.5, alternative=c("two.sided"), conf.level = 0.95))
+                    }
+                    else{
+                        print("Normal data and outliers present: Paired T Test Terminated")
+                    }
+                }
+                else{
+                    print("Data sets uneven size and outliers present: Paired T Test Terminated")
+                }
+            }
+        }
+    }
+}
+
+beginTests()
